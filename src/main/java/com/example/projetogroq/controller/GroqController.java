@@ -1,7 +1,7 @@
 package com.example.projetogroq.controller;
 
-import com.example.projetogroq.dto.groq.GroqResponseDTO;
 import com.example.projetogroq.dto.input.PresentationRequestDTO;
+import com.example.projetogroq.dto.output.PresentationResponseDTO;
 import com.example.projetogroq.service.GroqService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,13 +19,9 @@ public class GroqController {
         this.groqService = groqService;
     }
 
-    @PostMapping("/text")
-    public ResponseEntity<GroqResponseDTO> generateSlides(@RequestBody PresentationRequestDTO dto){
-        GroqResponseDTO response = groqService.generatePresentation(dto);
-
-        // TODO: Fazer um PresentationResponseDTO
-        System.out.println(response.choices().getFirst().message().content());
-
+    @PostMapping("/generate")
+    public ResponseEntity<PresentationResponseDTO> generateSlides(@RequestBody PresentationRequestDTO dto){
+        PresentationResponseDTO response = groqService.generatePresentation(dto);
         return ResponseEntity.ok(response);
     }
 }
