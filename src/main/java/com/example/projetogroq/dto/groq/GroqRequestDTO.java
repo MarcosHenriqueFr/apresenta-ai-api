@@ -6,5 +6,6 @@ import java.util.Map;
 public record GroqRequestDTO(
         String model,
         List<MessageDTO> messages,
-        ResponseFormatDTO response_format
+        ResponseFormatDTO response_format,
+        double temperature
 ) { }
