@@ -4,6 +4,7 @@ import com.example.projetogroq.dto.OutputQuality;
 import com.example.projetogroq.dto.groq.*;
 import com.example.projetogroq.dto.input.PresentationRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -17,11 +18,15 @@ public class GroqService {
 
     private final WebClient webClient;
     private final ObjectMapper mapper;
+    private final SessionService sessionService;
 
-    public GroqService(WebClient webClient, ObjectMapper mapper){
+    public GroqService(WebClient webClient, ObjectMapper mapper, SessionService sessionService){
         this.webClient = webClient;
         this.mapper = mapper;
+        this.sessionService = sessionService;
     }
+
+    // TODO: Criar exceptions mais específicas
 
     // O bodyValue() já faz a conversão de dto para objeto JSON
     // Já que está sendo feito um post request na API, por isso que também se usa .bodyValue()
@@ -33,7 +38,7 @@ public class GroqService {
      * @param dto Com as informações preenchidas pelo client.
      * @return {@link PresentationResponseDTO} convertido das informações do {@link GroqResponseDTO}
      */
-    public PresentationResponseDTO generatePresentation(PresentationRequestDTO dto){
+    public PresentationResponseDTO generatePresentation(HttpSession session, PresentationRequestDTO dto){
 
         double temperature = 0.7;
         int maxRetries = 3;
@@ -55,7 +60,11 @@ public class GroqService {
                         .blockOptional()
                         .orElseThrow(() -> new IllegalStateException("Groq returned empty response"));
 
-                return convertApiResponse(groqResponse);
+                PresentationResponseDTO response = convertApiResponse(groqResponse);
+
+                sessionService.savePresentationData(session, response);
+
+                return response;
 
             } catch(WebClientResponseException e){
                 boolean isStatusCode400 = e.getStatusCode().value() == 400;
