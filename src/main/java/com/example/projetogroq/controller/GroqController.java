@@ -31,8 +31,8 @@ public class GroqController {
 
         PresentationResponseDTO response = groqService.generatePresentation(session, dto);
 
-        logger.info("Sessão criada: {}", session.getId());
-        logger.info("Apresentação salva na sessão com sucesso.");
+        logger.info("Created session: {}", session.getId());
+        logger.info("Presentation was saved successfully.");
 
         return ResponseEntity.ok(response);
     }
