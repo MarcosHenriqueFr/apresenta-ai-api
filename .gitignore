@@ -35,4 +35,3 @@ build/
 ### Do projeto ###
 .env
 src/main/resources/application.yaml
-src/main/resources
