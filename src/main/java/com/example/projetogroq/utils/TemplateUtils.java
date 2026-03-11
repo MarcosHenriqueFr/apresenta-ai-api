@@ -7,6 +7,10 @@ import org.apache.poi.xslf.usermodel.XSLFSlideMaster;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * Classe de acesso aos templates e layout criados nele.
+ * Faz o acesso de nível mais baixo aos templates dentro dos recursos do servidor.
+ */
 public class TemplateUtils {
 
     private static final String BASIC_PATH = "/templates/ppt/presentation_template1.pptx";

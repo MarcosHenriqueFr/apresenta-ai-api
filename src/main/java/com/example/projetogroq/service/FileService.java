@@ -6,7 +6,6 @@ import com.example.projetogroq.dto.output.PresentationResponseDTO;
 import com.example.projetogroq.dto.output.SlideDTO;
 import com.example.projetogroq.utils.TemplateUtils;
 import jakarta.servlet.http.HttpSession;
-import org.apache.poi.sl.usermodel.Placeholder;
 import org.apache.poi.xslf.usermodel.*;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +30,13 @@ public class FileService {
         return createPptxFile(presentation, dto);
     }
 
+    /**
+     * Agrupa toda a lógica para a criação do arquivo, se baseando principalmente nas informações guardadas em sessão
+     * @param presentation Contém a resposta da API externa na sessão
+     * @param dto Contém as informações de estilo
+     * @return O arquivo definido de acordo com o template
+     * @throws IOException Caso o arquivo de template não seja encontrado no servidor
+     */
     private byte[] createPptxFile(PresentationResponseDTO presentation, DownloadRequestDTO dto) throws IOException {
         try(XMLSlideShow ppt = getRelatedTemplate(dto)){
 
@@ -67,12 +73,19 @@ public class FileService {
         subtitle.setText("");
     }
 
+    /**
+     * Age sobre a resposta da API externa para a formatação desse DTO em slides dentro de um arquivo
+     * .pptx
+     * @param slides Provenientes de {@link PresentationResponseDTO}
+     * @param ppt Objeto que agrupa todos os componentes do slide, como definido no template
+     * @param master Responsável pela visão dos layouts do template
+     */
     private void createSlidesBullets(List<SlideDTO> slides, XMLSlideShow ppt, XSLFSlideMaster master) {
         XSLFSlideLayout layoutContent = TemplateUtils.getLayoutTitleContent(master);
 
-        XSLFSlide slide = null;
-        XSLFTextShape title = null;
-        XSLFTextShape content = null;
+        XSLFSlide slide;
+        XSLFTextShape title;
+        XSLFTextShape content;
 
         for (SlideDTO slideDTO : slides) {
             slide = ppt.createSlide(layoutContent);
@@ -103,6 +116,13 @@ public class FileService {
         return TemplateUtils.loadTemplateBasic();
     }
 
+    /**
+     * Abstrai a lógica de existência da {@link HttpSession} e do {@link PresentationResponseDTO}.
+     * Garantindo que ambos tenham sido instânciados através do {@link SessionService}.
+     * @param session Recebida da request do client
+     * @return Um presentation DTO válido
+     * @throws IllegalStateException Caso uma sessão ou apresentação não exista.
+     */
     private PresentationResponseDTO getPresentationData(HttpSession session){
         sessionService.checkSessionExistence(session);
 
