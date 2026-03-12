@@ -176,7 +176,10 @@ public class GroqService {
      * @return O modelo de IA
      */
     private String chooseModel(PresentationRequestDTO dto) {
-        return dto.quality() == OutputQuality.PREMIUM
+        String qualityString = dto.quality();
+        OutputQuality desiredQuality = OutputQuality.valueOf(qualityString);
+
+        return desiredQuality == OutputQuality.PREMIUM
                 ? "openai/gpt-oss-120b"
                 : "openai/gpt-oss-20b";
     }
