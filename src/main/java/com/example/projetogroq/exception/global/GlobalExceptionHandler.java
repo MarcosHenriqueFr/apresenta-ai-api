@@ -2,16 +2,25 @@ package com.example.projetogroq.exception.global;
 
 import com.example.projetogroq.exception.*;
 import io.netty.handler.timeout.ReadTimeoutException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.reactive.function.client.WebClientException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -179,6 +188,44 @@ public class GlobalExceptionHandler {
                 "External communication error",
                 e,
                 "Unexpected WebClient error: {}"
+        );
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ExceptionResponse> handleValidationExceptions(ConstraintViolationException e){
+        HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
+
+        Set<ConstraintViolation<?>> errors = e.getConstraintViolations();
+        List<String> errorsMessages = errors.stream()
+                .map(ConstraintViolation::getMessageTemplate)
+                .toList();
+
+        return buildErrorResponse(
+                status,
+                errorsMessages.toString(),
+                e,
+                "Validation error: {}"
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ExceptionResponse> handleInvalidDTO(MethodArgumentNotValidException e){
+        HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
+
+        Map<String, String> errors = new HashMap<>();
+        e.getBindingResult().getAllErrors().forEach(
+                error -> {
+                    String name = ((FieldError) error).getField();
+                    String message = error.getDefaultMessage();
+                    errors.put(name, message);
+                }
+        );
+
+        return buildErrorResponse(
+                status,
+                errors.toString(),
+                e,
+                "Invalid api request."
         );
     }
 
