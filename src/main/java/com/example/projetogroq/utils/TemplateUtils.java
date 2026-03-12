@@ -1,5 +1,6 @@
 package com.example.projetogroq.utils;
 
+import com.example.projetogroq.exception.PresentationTemplateNotFoundIOException;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFSlideLayout;
 import org.apache.poi.xslf.usermodel.XSLFSlideMaster;
@@ -25,7 +26,7 @@ public class TemplateUtils {
         InputStream is = TemplateUtils.class.getResourceAsStream(path);
 
         if(is == null){
-            throw new IOException("Template was not found: " + path);
+            throw new PresentationTemplateNotFoundIOException("Template was not found: " + path);
         }
 
         return new XMLSlideShow(is);

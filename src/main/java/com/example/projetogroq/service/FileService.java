@@ -4,6 +4,7 @@ import com.example.projetogroq.dto.SlideStyle;
 import com.example.projetogroq.dto.input.DownloadRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
 import com.example.projetogroq.dto.output.SlideDTO;
+import com.example.projetogroq.exception.IllegalPresentationStateException;
 import com.example.projetogroq.utils.TemplateUtils;
 import jakarta.servlet.http.HttpSession;
 import org.apache.poi.xslf.usermodel.*;
@@ -15,8 +16,6 @@ import java.util.List;
 
 @Service
 public class FileService {
-
-    // TODO: Criar exceptions mais específicas posteriormente
 
     private final SessionService sessionService;
 
@@ -121,7 +120,7 @@ public class FileService {
      * Garantindo que ambos tenham sido instânciados através do {@link SessionService}.
      * @param session Recebida da request do client
      * @return Um presentation DTO válido
-     * @throws IllegalStateException Caso uma sessão ou apresentação não exista.
+     * @throws IllegalPresentationStateException Caso uma sessão ou apresentação não exista.
      */
     private PresentationResponseDTO getPresentationData(HttpSession session){
         sessionService.checkSessionExistence(session);
@@ -134,7 +133,7 @@ public class FileService {
 
     private void checkPresentationExistence(PresentationResponseDTO presentation) {
         if(presentation == null){
-            throw new IllegalStateException("No presentation found. Generate a presentation first.");
+            throw new IllegalPresentationStateException("No presentation found. Generate a presentation first.");
         }
     }
 }

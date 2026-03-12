@@ -4,6 +4,9 @@ import com.example.projetogroq.dto.OutputQuality;
 import com.example.projetogroq.dto.groq.*;
 import com.example.projetogroq.dto.input.PresentationRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
+import com.example.projetogroq.exception.GroqIllegalResponseException;
+import com.example.projetogroq.exception.GroqResponseParseException;
+import com.example.projetogroq.exception.GroqTooManyAttempsException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -25,8 +28,6 @@ public class GroqService {
         this.mapper = mapper;
         this.sessionService = sessionService;
     }
-
-    // TODO: Criar exceptions mais específicas
 
     // O bodyValue() já faz a conversão de dto para objeto JSON
     // Já que está sendo feito um post request na API, por isso que também se usa .bodyValue()
@@ -79,7 +80,7 @@ public class GroqService {
             }
         }
 
-        throw new RuntimeException("Failed after too many retries.");
+        throw new GroqTooManyAttempsException("Failed after too many retries.");
     }
 
     /**
@@ -92,14 +93,14 @@ public class GroqService {
         boolean isChoiceNull = groqResponse.choices() == null;
 
         if (isChoiceNull || groqResponse.choices().isEmpty()){
-            throw new IllegalStateException("Groq returned no choices");
+            throw new GroqIllegalResponseException("Groq returned no choices");
         }
 
         try {
             String contentJson = groqResponse.choices().getFirst().message().content();
             return mapper.readValue(contentJson, PresentationResponseDTO.class);
         } catch (Exception e){
-            throw new RuntimeException("Failed to parse groq response.");
+            throw new GroqResponseParseException("Failed to parse groq response.");
         }
     }
 

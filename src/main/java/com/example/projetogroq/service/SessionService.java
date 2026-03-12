@@ -1,13 +1,12 @@
 package com.example.projetogroq.service;
 
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
+import com.example.projetogroq.exception.IllegalSessionStateException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SessionService {
-
-    // TODO: Criar exceptions mais específicas
 
     private static final String SESSION_ATT_PRESENTATION = "presentationData";
 
@@ -21,7 +20,7 @@ public class SessionService {
 
     void checkSessionExistence(HttpSession session) {
         if(session == null){
-            throw new IllegalStateException("No active session found. Generate a presentation before.");
+            throw new IllegalSessionStateException("No active session found. Generate a presentation before.");
         }
     }
 }
