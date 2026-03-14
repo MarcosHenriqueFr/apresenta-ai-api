@@ -106,9 +106,12 @@ public class FileService {
     }
 
     private XMLSlideShow getRelatedTemplate(DownloadRequestDTO dto) throws IOException {
-        if (dto.style() == SlideStyle.ACADEMIC){
+
+        SlideStyle desiredStyle = SlideStyle.valueOf(dto.style());
+
+        if (desiredStyle == SlideStyle.ACADEMIC){
             return TemplateUtils.loadTemplateAcademic();
-        } else if (dto.style() == SlideStyle.CREATIVE){
+        } else if (desiredStyle == SlideStyle.CREATIVE){
             return TemplateUtils.loadTemplateCreative();
         }
 

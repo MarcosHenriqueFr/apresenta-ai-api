@@ -1,8 +1,11 @@
 package com.example.projetogroq.dto.input;
 
-import com.example.projetogroq.dto.SlideStyle;
+import com.example.projetogroq.dto.validator.ValidSlideStyle;
+import jakarta.validation.constraints.NotNull;
 
-// TODO: Validação para enums com validator
 public record DownloadRequestDTO(
-        SlideStyle style
+
+        @NotNull(message = "Should send style info.")
+        @ValidSlideStyle
+        String style
 ) { }

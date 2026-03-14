@@ -4,11 +4,13 @@ import com.example.projetogroq.dto.input.DownloadRequestDTO;
 import com.example.projetogroq.service.FileService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -17,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/files")
+@Validated
 public class FileController {
 
     private static final Logger logger = LoggerFactory.getLogger(FileController.class);
@@ -35,7 +38,7 @@ public class FileController {
      * @throws IOException Caso o template do slide não exista nos recursos do servidor
      */
     @PostMapping("/pptx")
-    public ResponseEntity<byte[]> downloadPptx(HttpServletRequest request, @RequestBody DownloadRequestDTO dto) throws IOException {
+    public ResponseEntity<byte[]> downloadPptx(HttpServletRequest request, @Valid @RequestBody DownloadRequestDTO dto) throws IOException {
 
         // Define o arquivo final
         HttpSession session = request.getSession(false);
@@ -63,7 +66,7 @@ public class FileController {
 
     // Define o nome do arquivo de acordo com o estilo selecionado
     private String generateFilename(DownloadRequestDTO dto) {
-        String style = dto.style() != null ? dto.style().name().toLowerCase() : "default";
+        String style = dto.style() != null ? dto.style().toLowerCase() : "default";
 
         return String.format("presentation_%s.pptx", style);
     }
