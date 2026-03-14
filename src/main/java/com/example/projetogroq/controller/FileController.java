@@ -46,6 +46,14 @@ public class FileController {
 
         logger.info("File .pptx created successfully by: {}", session.getId());
 
+        HttpHeaders headers = createHeader(dto, pptContent);
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pptContent);
+    }
+
+    private HttpHeaders createHeader(DownloadRequestDTO dto, byte[] pptContent) {
         // Define a nomenclatura do arquivo final
         String filename = generateFilename(dto);
         String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
@@ -59,9 +67,7 @@ public class FileController {
                 "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encodedFilename
         );
 
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(pptContent);
+        return headers;
     }
 
     // Define o nome do arquivo de acordo com o estilo selecionado
