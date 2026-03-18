@@ -1,14 +1,15 @@
 package com.example.projetogroq.service;
 
-import com.example.projetogroq.dto.OutputQuality;
+import com.example.projetogroq.dto.enums.OutputQuality;
 import com.example.projetogroq.dto.groq.*;
 import com.example.projetogroq.dto.input.PresentationRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
-import com.example.projetogroq.exception.GroqIllegalResponseException;
-import com.example.projetogroq.exception.GroqResponseParseException;
-import com.example.projetogroq.exception.GroqTooManyAttempsException;
+import com.example.projetogroq.exception.custom.GroqIllegalResponseException;
+import com.example.projetogroq.exception.custom.GroqResponseParseException;
+import com.example.projetogroq.exception.custom.GroqTooManyAttempsException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import tools.jackson.databind.ObjectMapper;
@@ -22,11 +23,18 @@ public class GroqService {
     private final WebClient webClient;
     private final ObjectMapper mapper;
     private final SessionService sessionService;
+    private final FileService fileService;
 
-    public GroqService(WebClient webClient, ObjectMapper mapper, SessionService sessionService){
+    public GroqService(
+            WebClient webClient,
+            ObjectMapper mapper,
+            SessionService sessionService,
+            FileService fileService
+    ){
         this.webClient = webClient;
         this.mapper = mapper;
         this.sessionService = sessionService;
+        this.fileService = fileService;
     }
 
     // O bodyValue() já faz a conversão de dto para objeto JSON
@@ -39,13 +47,21 @@ public class GroqService {
      * @param dto Com as informações preenchidas pelo client.
      * @return {@link PresentationResponseDTO} convertido das informações do {@link GroqResponseDTO}
      */
-    public PresentationResponseDTO generatePresentation(HttpSession session, PresentationRequestDTO dto){
+    public PresentationResponseDTO generatePresentation(
+            HttpSession session,
+            PresentationRequestDTO dto,
+            List<MultipartFile> pdfs
+    ){
+
+        fileService.checkPdfAmount(pdfs);
+        List<String> pdfInfo = fileService.getContextFilesText(pdfs);
+
+        // TODO: Fazer a leitura dos conteúdos do pdf para dentro do contexto
 
         double temperature = 0.7;
         int maxRetries = 3;
 
         String context = createContext(dto);
-
         String model = chooseModel(dto);
 
         for(int attempt = 0; attempt < maxRetries; attempt++){
@@ -213,6 +229,6 @@ public class GroqService {
                 Não use blocos de código.
                 Não inclua texto antes ou depois.
                 """
-                .formatted(dto.topic(), dto.durationInMinutes(), dto.level().toString());
+                .formatted(dto.topic(), dto.durationInMinutes(), dto.level());
     }
 }

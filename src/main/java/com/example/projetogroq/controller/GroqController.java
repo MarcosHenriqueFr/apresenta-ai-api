@@ -10,10 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/presentation")
@@ -24,16 +25,21 @@ public class GroqController {
 
     private final GroqService groqService;
 
-    public GroqController(GroqService groqService){
+    public GroqController(GroqService groqService) {
         this.groqService = groqService;
     }
 
-    @PostMapping("/generate")
+    // TODO: Adicionar validação de tamanho e de existência de pdf com validator
+    @PostMapping(value = "/generate", consumes = "multipart/form-data")
     public ResponseEntity<PresentationResponseDTO> generateSlides(
-            HttpServletRequest request, @Valid @RequestBody PresentationRequestDTO dto){
+            HttpServletRequest request,
+            @Valid @RequestPart("data") PresentationRequestDTO dto,
+            @RequestPart(value = "pdfs", required = false) List<MultipartFile> pdfs
+            ) {
         HttpSession session = request.getSession(true);
 
-        PresentationResponseDTO response = groqService.generatePresentation(session, dto);
+        PresentationResponseDTO response =
+                groqService.generatePresentation(session, dto, pdfs);
 
         logger.info("Created session: {}", session.getId());
         logger.info("Presentation was saved successfully.");
