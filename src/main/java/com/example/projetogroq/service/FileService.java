@@ -1,17 +1,22 @@
 package com.example.projetogroq.service;
 
-import com.example.projetogroq.dto.SlideStyle;
+import com.example.projetogroq.dto.enums.SlideStyle;
 import com.example.projetogroq.dto.input.DownloadRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
 import com.example.projetogroq.dto.output.SlideDTO;
-import com.example.projetogroq.exception.IllegalPresentationStateException;
+import com.example.projetogroq.exception.custom.IllegalPresentationStateException;
 import com.example.projetogroq.utils.TemplateUtils;
 import jakarta.servlet.http.HttpSession;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xslf.usermodel.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -137,6 +142,39 @@ public class FileService {
     private void checkPresentationExistence(PresentationResponseDTO presentation) {
         if(presentation == null){
             throw new IllegalPresentationStateException("No presentation found. Generate a presentation first.");
+        }
+    }
+
+    String extractText(MultipartFile file) throws IOException {
+        try(PDDocument document = Loader.loadPDF(file.getInputStream().readAllBytes())){
+
+            PDFTextStripper stripper = new PDFTextStripper();
+
+            return stripper.getText(document);
+        }
+    }
+
+    public List<String> getContextFilesText(List<MultipartFile> pdfs) {
+
+        // TODO: Adicionar leitura dos pdfs de forma assincrona com CompletableFuture
+        List<String> info = new ArrayList<>();
+        if(pdfs != null){
+            for(MultipartFile pdf : pdfs){
+                try {
+                    String text = extractText(pdf);
+                    info.add(text);
+                } catch (IOException e){
+                    throw new RuntimeException("Error reading existing PDF", e);
+                }
+            }
+        }
+
+        return info;
+    }
+
+    void checkPdfAmount(List<MultipartFile> pdfs) {
+        if(pdfs.size() > 3){
+            throw new RuntimeException("The file limit has been exceeded.");
         }
     }
 }
