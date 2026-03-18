@@ -1,4 +1,4 @@
-package com.example.projetogroq.dto;
+package com.example.projetogroq.dto.enums;
 
 public enum OutputQuality {
     STANDARD, PREMIUM

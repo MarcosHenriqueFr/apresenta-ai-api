@@ -1,7 +1,7 @@
 package com.example.projetogroq.service;
 
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
-import com.example.projetogroq.exception.IllegalSessionStateException;
+import com.example.projetogroq.exception.custom.IllegalSessionStateException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 

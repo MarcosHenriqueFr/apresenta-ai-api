@@ -1,6 +1,6 @@
 package com.example.projetogroq.dto.validator;
 
-import com.example.projetogroq.dto.SlideLevel;
+import com.example.projetogroq.dto.enums.SlideLevel;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

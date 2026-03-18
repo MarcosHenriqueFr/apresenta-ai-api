@@ -1,4 +1,4 @@
-package com.example.projetogroq.exception;
+package com.example.projetogroq.exception.custom;
 
 import java.io.IOException;
 

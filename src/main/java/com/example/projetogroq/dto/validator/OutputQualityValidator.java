@@ -1,6 +1,6 @@
 package com.example.projetogroq.dto.validator;
 
-import com.example.projetogroq.dto.OutputQuality;
+import com.example.projetogroq.dto.enums.OutputQuality;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

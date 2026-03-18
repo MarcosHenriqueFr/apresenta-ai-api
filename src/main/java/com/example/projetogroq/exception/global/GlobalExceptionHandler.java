@@ -1,6 +1,6 @@
 package com.example.projetogroq.exception.global;
 
-import com.example.projetogroq.exception.*;
+import com.example.projetogroq.exception.custom.*;
 import io.netty.handler.timeout.ReadTimeoutException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;

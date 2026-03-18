@@ -1,6 +1,6 @@
 package com.example.projetogroq.utils;
 
-import com.example.projetogroq.exception.PresentationTemplateNotFoundIOException;
+import com.example.projetogroq.exception.custom.PresentationTemplateNotFoundIOException;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFSlideLayout;
 import org.apache.poi.xslf.usermodel.XSLFSlideMaster;
