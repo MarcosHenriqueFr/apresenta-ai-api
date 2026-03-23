@@ -53,16 +53,14 @@ public class GroqService {
             List<MultipartFile> pdfs
     ){
 
-        fileService.checkPdfAmount(pdfs);
-        List<String> pdfInfo = fileService.getContextFilesText(pdfs);
-
-        // TODO: Fazer a leitura dos conteúdos do pdf para dentro do contexto
+        // TODO: Fazer a lógica de checar lista null para contexto
+        Boolean available = fileService.checkPdfAvailability(pdfs);
+        String pdfContext = fileService.getContextFromFiles(pdfs, available);
+        String context = createContext(dto, pdfContext);
+        String model = chooseModel(dto);
 
         double temperature = 0.7;
         int maxRetries = 3;
-
-        String context = createContext(dto);
-        String model = chooseModel(dto);
 
         for(int attempt = 0; attempt < maxRetries; attempt++){
             try {
@@ -205,7 +203,7 @@ public class GroqService {
      * @param dto Com as inforamações preenchidas pelo client.
      * @return Um contexto válido para ser colocado dentro do {@link GroqRequestDTO}
      */
-    private String createContext(PresentationRequestDTO dto){
+    private String createContext(PresentationRequestDTO dto, String pdfContext){
         return """
                 Crie slides em formato profissional com bullet points claros e organizados.
                 
@@ -228,7 +226,9 @@ public class GroqService {
                 Não use markdown.
                 Não use blocos de código.
                 Não inclua texto antes ou depois.
+                
+                Como base de dados: %s
                 """
-                .formatted(dto.topic(), dto.durationInMinutes(), dto.level());
+                .formatted(dto.topic(), dto.durationInMinutes(), dto.level(), pdfContext);
     }
 }
