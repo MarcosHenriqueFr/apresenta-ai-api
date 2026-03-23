@@ -12,20 +12,26 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xslf.usermodel.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Service
 public class FileService {
 
-    private final SessionService sessionService;
+    private static final Integer MAX_CHARS_PER_PDF = 3000;
 
-    public FileService(SessionService sessionService){
+    private final SessionService sessionService;
+    private final Executor executor;
+
+    public FileService(SessionService sessionService, Executor executor) {
         this.sessionService = sessionService;
+        this.executor = executor;
     }
 
     public byte[] downloadPptxFile(HttpSession session, DownloadRequestDTO dto) throws IOException {
@@ -36,13 +42,14 @@ public class FileService {
 
     /**
      * Agrupa toda a lógica para a criação do arquivo, se baseando principalmente nas informações guardadas em sessão
+     *
      * @param presentation Contém a resposta da API externa na sessão
-     * @param dto Contém as informações de estilo
+     * @param dto          Contém as informações de estilo
      * @return O arquivo definido de acordo com o template
      * @throws IOException Caso o arquivo de template não seja encontrado no servidor
      */
     private byte[] createPptxFile(PresentationResponseDTO presentation, DownloadRequestDTO dto) throws IOException {
-        try(XMLSlideShow ppt = getRelatedTemplate(dto)){
+        try (XMLSlideShow ppt = getRelatedTemplate(dto)) {
 
             XSLFSlideMaster master = ppt.getSlideMasters().getFirst();
 
@@ -50,7 +57,7 @@ public class FileService {
             createSlidesBullets(presentation.slides(), ppt, master);
             createGratitudeSlide(ppt, master);
 
-            try(ByteArrayOutputStream baos = new ByteArrayOutputStream()){
+            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                 ppt.write(baos);
                 return baos.toByteArray();
             }
@@ -80,8 +87,9 @@ public class FileService {
     /**
      * Age sobre a resposta da API externa para a formatação desse DTO em slides dentro de um arquivo
      * .pptx
+     *
      * @param slides Provenientes de {@link PresentationResponseDTO}
-     * @param ppt Objeto que agrupa todos os componentes do slide, como definido no template
+     * @param ppt    Objeto que agrupa todos os componentes do slide, como definido no template
      * @param master Responsável pela visão dos layouts do template
      */
     private void createSlidesBullets(List<SlideDTO> slides, XMLSlideShow ppt, XSLFSlideMaster master) {
@@ -114,9 +122,9 @@ public class FileService {
 
         SlideStyle desiredStyle = SlideStyle.valueOf(dto.style());
 
-        if (desiredStyle == SlideStyle.ACADEMIC){
+        if (desiredStyle == SlideStyle.ACADEMIC) {
             return TemplateUtils.loadTemplateAcademic();
-        } else if (desiredStyle == SlideStyle.CREATIVE){
+        } else if (desiredStyle == SlideStyle.CREATIVE) {
             return TemplateUtils.loadTemplateCreative();
         }
 
@@ -126,11 +134,12 @@ public class FileService {
     /**
      * Abstrai a lógica de existência da {@link HttpSession} e do {@link PresentationResponseDTO}.
      * Garantindo que ambos tenham sido instânciados através do {@link SessionService}.
+     *
      * @param session Recebida da request do client
      * @return Um presentation DTO válido
      * @throws IllegalPresentationStateException Caso uma sessão ou apresentação não exista.
      */
-    private PresentationResponseDTO getPresentationData(HttpSession session){
+    private PresentationResponseDTO getPresentationData(HttpSession session) {
         sessionService.checkSessionExistence(session);
 
         PresentationResponseDTO presentationDTO = sessionService.getPresentationData(session);
@@ -140,41 +149,70 @@ public class FileService {
     }
 
     private void checkPresentationExistence(PresentationResponseDTO presentation) {
-        if(presentation == null){
+        if (presentation == null) {
             throw new IllegalPresentationStateException("No presentation found. Generate a presentation first.");
         }
     }
 
-    String extractText(MultipartFile file) throws IOException {
-        try(PDDocument document = Loader.loadPDF(file.getInputStream().readAllBytes())){
+    public String getContextFromFiles(List<MultipartFile> pdfs, Boolean available) {
+        if (!available) return "";
 
-            PDFTextStripper stripper = new PDFTextStripper();
+        StopWatch watch = new StopWatch();
+        watch.start();
 
-            return stripper.getText(document);
-        }
+        // TODO: Colocar uma exception personalizada
+        // Faz a leitura dos bytes dentro dos contextos e não na memória com o PDFBox
+        List<CompletableFuture<String>> futures = pdfs.stream()
+                .map(f -> {
+                    try {
+                        byte[] bytes = f.getBytes();
+                        return CompletableFuture.supplyAsync(
+                                () -> extractTextFromBytes(bytes), executor
+                        );
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .toList();
+
+        // Faz a construção da string com o texto lido de forma assíncrona
+        String result = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    StringBuilder sb = new StringBuilder("Use essas informações como apoio de dados reais.\n");
+                    futures.stream().map(CompletableFuture::join).forEach(sb::append);
+                    return sb.toString();
+                })
+                .join();
+
+        watch.stop();
+        System.out.println("Tempo total: " + watch.getTotalTimeMillis() + "ms");
+
+        return result;
     }
 
-    public List<String> getContextFilesText(List<MultipartFile> pdfs) {
+    String extractTextFromBytes(byte[] bytes) {
+        try (PDDocument document = Loader.loadPDF(bytes)) {
+            String fullText = new PDFTextStripper().getText(document);
 
-        // TODO: Adicionar leitura dos pdfs de forma assincrona com CompletableFuture
-        List<String> info = new ArrayList<>();
-        if(pdfs != null){
-            for(MultipartFile pdf : pdfs){
-                try {
-                    String text = extractText(pdf);
-                    info.add(text);
-                } catch (IOException e){
-                    throw new RuntimeException("Error reading existing PDF", e);
-                }
+            if(fullText.length() > MAX_CHARS_PER_PDF){
+                return fullText.substring(0, MAX_CHARS_PER_PDF) + "\n[TRUNCATED TEXT]";
             }
-        }
 
-        return info;
+            return fullText;
+        } catch (IOException e) {
+            throw new RuntimeException("Couldn't read text from PDF.", e);
+        }
     }
 
-    void checkPdfAmount(List<MultipartFile> pdfs) {
-        if(pdfs.size() > 3){
+    boolean checkPdfAvailability(List<MultipartFile> pdfs) {
+        if (pdfs == null) {
+            return false;
+        }
+
+        if (pdfs.size() > 3) {
             throw new RuntimeException("The file limit has been exceeded.");
         }
+
+        return true;
     }
 }
