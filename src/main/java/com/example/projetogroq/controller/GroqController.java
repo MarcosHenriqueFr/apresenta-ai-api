@@ -29,7 +29,6 @@ public class GroqController {
         this.groqService = groqService;
     }
 
-    // TODO: Adicionar validação de tamanho e de existência de pdf com validator
     @PostMapping(value = "/generate", consumes = "multipart/form-data")
     public ResponseEntity<PresentationResponseDTO> generateSlides(
             HttpServletRequest request,
