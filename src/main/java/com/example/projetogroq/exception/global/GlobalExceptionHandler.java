@@ -57,6 +57,36 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ExceptionResponse> handleGenericRuntimeException(RuntimeException e){
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error has ocurred.",
+                e,
+                "Unexpected exception happened: {}"
+        );
+    }
+
+    @ExceptionHandler(InvalidFileOperationException.class)
+    public ResponseEntity<ExceptionResponse> handleFileOperationException(InvalidFileOperationException e){
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "An error occurred while processing the files",
+                e,
+                "An error happened handling the pdfs text or bytes: {}"
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ExceptionResponse> handleInvalidArgument(IllegalArgumentException e){
+        return buildErrorResponse(
+                HttpStatus.UNPROCESSABLE_CONTENT,
+                "The request break the following rule: " + e.getMessage(),
+                e,
+                "An error happened related to the file processes: {}"
+        );
+    }
+
     @ExceptionHandler(GroqTooManyAttempsException.class)
     public ResponseEntity<ExceptionResponse> handleFailedGeneratedJson(GroqTooManyAttempsException e) {
         return buildErrorResponse(
