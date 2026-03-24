@@ -249,14 +249,13 @@ public class GroqService {
      * @return Um contexto válido para ser colocado dentro do {@link GroqRequestDTO}
      */
     private String createContext(PresentationRequestDTO dto, String pdfContext) {
-        logger.debug("{}", pdfContext);
         return """
                 Crie slides em formato profissional com bullet points claros e organizados.
                 
                 IMPORTANTE:
                 - Não invente estatísticas específicas ou valores numéricos exatos.
                 - Caso não tenha dados confirmáveis, use descrições qualitativas.
-                - Não crie referências fictícias.
+                - Não crie referências fictícias, principalmente estudos de casos imaginários.
                 - Se mencionar fontes, cite apenas instituições conhecidas sem criar links específicos.
                 
                 Tema: %s

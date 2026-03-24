@@ -5,6 +5,7 @@ import com.example.projetogroq.dto.input.DownloadRequestDTO;
 import com.example.projetogroq.dto.output.PresentationResponseDTO;
 import com.example.projetogroq.dto.output.SlideDTO;
 import com.example.projetogroq.exception.custom.IllegalPresentationStateException;
+import com.example.projetogroq.exception.custom.InvalidFileOperationException;
 import com.example.projetogroq.utils.TemplateUtils;
 import jakarta.servlet.http.HttpSession;
 import org.apache.pdfbox.Loader;
@@ -187,7 +188,7 @@ public class FileService {
                         byte[] bytes = file.getBytes();
                         return CompletableFuture.supplyAsync(() -> extractTextFromBytes(bytes), executor);
                     } catch (IOException e) {
-                        throw new RuntimeException("Failed to read bytes from uploaded PDF.", e);
+                        throw new InvalidFileOperationException("Failed to read bytes from uploaded PDF.", e);
                     }
                 })
                 .toList();
@@ -220,7 +221,7 @@ public class FileService {
 
             return fullText;
         } catch (IOException e) {
-            throw new RuntimeException("Couldn't read text from PDF.", e);
+            throw new InvalidFileOperationException("Couldn't read text from PDF.", e);
         }
     }
 
@@ -230,7 +231,7 @@ public class FileService {
         }
 
         if (pdfs.size() > MAX_PDF_FILES) {
-            throw new RuntimeException("The file limit has been exceeded.");
+            throw new IllegalArgumentException("The file limit has been exceeded.");
         }
 
         return true;
