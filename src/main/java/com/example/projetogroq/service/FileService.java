@@ -11,6 +11,8 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xslf.usermodel.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,7 +26,9 @@ import java.util.concurrent.Executor;
 @Service
 public class FileService {
 
-    private static final Integer MAX_CHARS_PER_PDF = 3000;
+    private static final Integer MAX_CHARS_PER_PDF = 5000;
+    private static final int MAX_PDF_FILES = 3;
+    private static final Logger logger = LoggerFactory.getLogger(FileService.class);
 
     private final SessionService sessionService;
     private final Executor executor;
@@ -154,47 +158,63 @@ public class FileService {
         }
     }
 
-    public String getContextFromFiles(List<MultipartFile> pdfs, Boolean available) {
+    public String getContextFromFiles(List<MultipartFile> pdfs, boolean available) {
         if (!available) return "";
 
         StopWatch watch = new StopWatch();
         watch.start();
 
-        // TODO: Colocar uma exception personalizada
-        // Faz a leitura dos bytes dentro dos contextos e não na memória com o PDFBox
-        List<CompletableFuture<String>> futures = pdfs.stream()
-                .map(f -> {
+        List<CompletableFuture<String>> futures = extractPdfTextsAsync(pdfs);
+        String result = joinPdfTexts(futures);
+
+        watch.stop();
+        logger.debug("PDF extraction completed in {}ms", watch.getTotalTimeMillis());
+
+        return result;
+    }
+
+    /**
+     * Lê os bytes de cada PDF e despacha a extração de texto de forma assíncrona.
+     * A leitura dos bytes ocorre na thread chamadora para evitar acesso concorrente ao MultipartFile.
+     *
+     * @param pdfs Arquivos enviados pelo client.
+     * @return Lista de futures com o texto extraído de cada PDF.
+     */
+    private List<CompletableFuture<String>> extractPdfTextsAsync(List<MultipartFile> pdfs) {
+        return pdfs.stream()
+                .map(file -> {
                     try {
-                        byte[] bytes = f.getBytes();
-                        return CompletableFuture.supplyAsync(
-                                () -> extractTextFromBytes(bytes), executor
-                        );
+                        byte[] bytes = file.getBytes();
+                        return CompletableFuture.supplyAsync(() -> extractTextFromBytes(bytes), executor);
                     } catch (IOException e) {
-                        throw new RuntimeException(e);
+                        throw new RuntimeException("Failed to read bytes from uploaded PDF.", e);
                     }
                 })
                 .toList();
+    }
 
-        // Faz a construção da string com o texto lido de forma assíncrona
-        String result = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(v -> {
-                    StringBuilder sb = new StringBuilder("Use essas informações como apoio de dados reais.\n");
-                    futures.stream().map(CompletableFuture::join).forEach(sb::append);
-                    return sb.toString();
-                })
-                .join();
+    /**
+     * Aguarda a conclusão de todos os futures e concatena os textos em um único contexto.
+     *
+     * @param futures Futures com texto extraído de cada PDF.
+     * @return Texto unificado para uso como contexto no prompt.
+     */
+    private String joinPdfTexts(List<CompletableFuture<String>> futures) {
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        watch.stop();
-        System.out.println("Tempo total: " + watch.getTotalTimeMillis() + "ms");
+        StringBuilder sb = new StringBuilder("Use essas informações como apoio de dados reais.\n");
+        futures.stream()
+                .map(CompletableFuture::join)
+                .forEach(sb::append);
 
-        return result;
+        return sb.toString();
     }
 
     String extractTextFromBytes(byte[] bytes) {
         try (PDDocument document = Loader.loadPDF(bytes)) {
             String fullText = new PDFTextStripper().getText(document);
 
-            if(fullText.length() > MAX_CHARS_PER_PDF){
+            if (fullText.length() > MAX_CHARS_PER_PDF) {
                 return fullText.substring(0, MAX_CHARS_PER_PDF) + "\n[TRUNCATED TEXT]";
             }
 
@@ -209,7 +229,7 @@ public class FileService {
             return false;
         }
 
-        if (pdfs.size() > 3) {
+        if (pdfs.size() > MAX_PDF_FILES) {
             throw new RuntimeException("The file limit has been exceeded.");
         }
 

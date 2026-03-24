@@ -8,6 +8,8 @@ import com.example.projetogroq.exception.custom.GroqIllegalResponseException;
 import com.example.projetogroq.exception.custom.GroqResponseParseException;
 import com.example.projetogroq.exception.custom.GroqTooManyAttempsException;
 import jakarta.servlet.http.HttpSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,6 +22,13 @@ import java.util.Map;
 @Service
 public class GroqService {
 
+    private static final double INITIAL_TEMPERATURE = 0.5;
+    private static final double TEMPERATURE_STEP = 0.1;
+    private static final double MIN_TEMPERATURE = 0.2;
+    private static final int MAX_RETRIES = 3;
+
+    private static final Logger logger = LoggerFactory.getLogger(GroqService.class);
+
     private final WebClient webClient;
     private final ObjectMapper mapper;
     private final SessionService sessionService;
@@ -30,7 +39,7 @@ public class GroqService {
             ObjectMapper mapper,
             SessionService sessionService,
             FileService fileService
-    ){
+    ) {
         this.webClient = webClient;
         this.mapper = mapper;
         this.sessionService = sessionService;
@@ -42,8 +51,8 @@ public class GroqService {
 
     /**
      * Para a construção da Apresentação a partir da resposta da API do Groq.
-     * Executa a requisição para a API externa 3 vezes e retorna um erro caso esse critério não seja atendido. <br>
-     * Cria o content da mensagem do Groq com os dados do {@link PresentationRequestDTO}.
+     * Orquestra a preparação do contexto, a chamada à API com retry e a persistência em sessão.
+     *
      * @param dto Com as informações preenchidas pelo client.
      * @return {@link PresentationResponseDTO} convertido das informações do {@link GroqResponseDTO}
      */
@@ -51,46 +60,55 @@ public class GroqService {
             HttpSession session,
             PresentationRequestDTO dto,
             List<MultipartFile> pdfs
-    ){
+    ) {
+        String context = buildPresentationContext(dto, pdfs);
+        String model = chooseModel(dto.quality());
 
-        // TODO: Fazer a lógica de checar lista null para contexto
-        Boolean available = fileService.checkPdfAvailability(pdfs);
+        PresentationResponseDTO response = callWithRetry(model, context);
+
+        sessionService.savePresentationData(session, response);
+
+        return response;
+    }
+
+    /**
+     * Monta o contexto completo do prompt, combinando os dados do formulário com o conteúdo dos PDFs.
+     *
+     * @param dto  Com as informações preenchidas pelo client.
+     * @param pdfs Arquivos opcionais enviados pelo client.
+     * @return Contexto formatado para envio ao modelo.
+     */
+    private String buildPresentationContext(PresentationRequestDTO dto, List<MultipartFile> pdfs) {
+        boolean available = fileService.checkPdfAvailability(pdfs);
         String pdfContext = fileService.getContextFromFiles(pdfs, available);
-        String context = createContext(dto, pdfContext);
-        String model = chooseModel(dto);
+        return createContext(dto, pdfContext);
+    }
 
-        double temperature = 0.7;
-        int maxRetries = 3;
+    /**
+     * Executa a requisição para a API externa com até {@link #MAX_RETRIES} tentativas.
+     * Reduz a temperatura a cada falha com status 400 para diminuir alucinações.
+     *
+     * @param model   Modelo de IA escolhido com base na qualidade.
+     * @param context Contexto completo do prompt.
+     * @return {@link PresentationResponseDTO} válido.
+     */
+    private PresentationResponseDTO callWithRetry(String model, String context) {
+        double temperature = INITIAL_TEMPERATURE;
 
-        for(int attempt = 0; attempt < maxRetries; attempt++){
+        // Nunca faz attemp = 3, já que o throw para a execução do loop antes.
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                GroqRequestDTO request = createRequest(model, context, temperature);
-
-                GroqResponseDTO groqResponse = webClient
-                        .post()
-                        .uri("/chat/completions")
-                        .bodyValue(request)
-                        .retrieve()
-                        .bodyToMono(GroqResponseDTO.class)
-                        .blockOptional()
-                        .orElseThrow(() -> new IllegalStateException("Groq returned empty response"));
-
-                PresentationResponseDTO response = convertApiResponse(groqResponse);
-
-                sessionService.savePresentationData(session, response);
-
-                return response;
-
-            } catch(WebClientResponseException e){
+                return executeApiCall(model, context, temperature);
+            } catch (WebClientResponseException e) {
                 boolean isStatusCode400 = e.getStatusCode().value() == 400;
-                boolean isAttemptPossible = attempt < maxRetries - 1;
+                boolean isRetryPossible = attempt < MAX_RETRIES - 1;
 
-                if(isStatusCode400 && isAttemptPossible){
-                    temperature = Math.max(temperature - 0.2, 0.2);
-                    continue;
+                if (!isStatusCode400 || !isRetryPossible) {
+                    throw e;
                 }
 
-                throw e;
+                temperature = Math.max(temperature - TEMPERATURE_STEP, MIN_TEMPERATURE);
+                logger.info("Retry Number {} for external api request.", attempt);
             }
         }
 
@@ -98,7 +116,31 @@ public class GroqService {
     }
 
     /**
+     * Executa uma única chamada à API do Groq e converte a resposta.
+     *
+     * @param model       Modelo de IA.
+     * @param context     Contexto do prompt.
+     * @param temperature Parâmetro de criatividade da resposta.
+     * @return {@link PresentationResponseDTO} parseado da resposta.
+     */
+    private PresentationResponseDTO executeApiCall(String model, String context, double temperature) {
+        GroqRequestDTO request = createRequest(model, context, temperature);
+
+        GroqResponseDTO groqResponse = webClient
+                .post()
+                .uri("/chat/completions")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(GroqResponseDTO.class)
+                .blockOptional()
+                .orElseThrow(() -> new IllegalStateException("Groq returned empty response"));
+
+        return convertApiResponse(groqResponse);
+    }
+
+    /**
      * Converte a resposta da API externa em uma da API interna para o armazenamento em Session
+     *
      * @param groqResponse - Vem diretamente da API externa
      * @return Um modelo válido da API interna para um client consumidor.
      */
@@ -106,26 +148,27 @@ public class GroqService {
 
         boolean isChoiceNull = groqResponse.choices() == null;
 
-        if (isChoiceNull || groqResponse.choices().isEmpty()){
+        if (isChoiceNull || groqResponse.choices().isEmpty()) {
             throw new GroqIllegalResponseException("Groq returned no choices");
         }
 
         try {
             String contentJson = groqResponse.choices().getFirst().message().content();
             return mapper.readValue(contentJson, PresentationResponseDTO.class);
-        } catch (Exception e){
+        } catch (Exception e) {
             throw new GroqResponseParseException("Failed to parse groq response.");
         }
     }
 
     /**
      * Cria a request seguindo o modelo JSON da API do Groq.
-     * @param model definido pela qualidade acessível ao usuário
-     * @param context definido pelas informações preenchidas pelo client.
+     *
+     * @param model       definido pela qualidade acessível ao usuário
+     * @param context     definido pelas informações preenchidas pelo client.
      * @param temperature um parâmetro que define a quantidade de alucinação/criatividade aceitável na resposta
      * @return Uma {@link GroqRequestDTO} viável para envio à API
      */
-    private GroqRequestDTO createRequest(String model, String context, double temperature){
+    private GroqRequestDTO createRequest(String model, String context, double temperature) {
         return new GroqRequestDTO(
                 model,
                 buildMessages(context),
@@ -143,6 +186,7 @@ public class GroqService {
 
     /**
      * Essencial para construir um Json válido para a API do Groq com o uso de um {@link ResponseFormatDTO}
+     *
      * @return Um response format com atributos stricts para retorno de JSON válido.
      */
     private ResponseFormatDTO buildResponseFormat() {
@@ -157,27 +201,27 @@ public class GroqService {
                 "slide_presentation",
                 true,
                 Map.of(
-                    "type", "object",
-                    "properties", Map.of(
-                        "title", Map.of("type", "string"),
-                        "slides", Map.of(
-                            "type", "array",
-                            "items", Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "title", Map.of("type", "string"),
-                                        "bullets", Map.of(
-                                                "type", "array",
-                                                "items", Map.of("type", "string")
+                        "type", "object",
+                        "properties", Map.of(
+                                "title", Map.of("type", "string"),
+                                "slides", Map.of(
+                                        "type", "array",
+                                        "items", Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                        "title", Map.of("type", "string"),
+                                                        "bullets", Map.of(
+                                                                "type", "array",
+                                                                "items", Map.of("type", "string")
+                                                        )
+                                                ),
+                                                "required", List.of("title", "bullets"),
+                                                "additionalProperties", false
                                         )
-                                    ),
-                                "required", List.of("title", "bullets"),
-                                "additionalProperties", false
                                 )
-                            )
                         ),
-                    "required", List.of("title", "slides"),
-                    "additionalProperties", false
+                        "required", List.of("title", "slides"),
+                        "additionalProperties", false
                 )
         );
     }
@@ -186,12 +230,12 @@ public class GroqService {
      * Escolhe o modelo de IA do Groq com base na qualidade de output,
      * esse valor precisa ser movido posteriormente
      * quando tiver um sistema de autenticação e roles de usuário.
-     * @param dto Com as informações preenchidas pelo client.
+     *
+     * @param quality Com as informações preenchidas pelo client.
      * @return O modelo de IA
      */
-    private String chooseModel(PresentationRequestDTO dto) {
-        String qualityString = dto.quality();
-        OutputQuality desiredQuality = OutputQuality.valueOf(qualityString);
+    private String chooseModel(String quality) {
+        OutputQuality desiredQuality = OutputQuality.valueOf(quality);
 
         return desiredQuality == OutputQuality.PREMIUM
                 ? "openai/gpt-oss-120b"
@@ -200,10 +244,12 @@ public class GroqService {
 
     /**
      * Define todas as limitações que a IA deve seguir para evitar alucinações de dados estatísticos.
+     *
      * @param dto Com as inforamações preenchidas pelo client.
      * @return Um contexto válido para ser colocado dentro do {@link GroqRequestDTO}
      */
-    private String createContext(PresentationRequestDTO dto, String pdfContext){
+    private String createContext(PresentationRequestDTO dto, String pdfContext) {
+        logger.debug("{}", pdfContext);
         return """
                 Crie slides em formato profissional com bullet points claros e organizados.
                 
@@ -227,7 +273,7 @@ public class GroqService {
                 Não use blocos de código.
                 Não inclua texto antes ou depois.
                 
-                Como base de dados: %s
+                %s
                 """
                 .formatted(dto.topic(), dto.durationInMinutes(), dto.level(), pdfContext);
     }
