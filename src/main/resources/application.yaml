@@ -1,0 +1,26 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: projetogroq
+
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 9MB
+
+groq:
+  api-key: ${GROQ_SECRET_KEY}
+
+server:
+  servlet:
+    session:
+      timeout: 1h
+      cookie:
+        max-age: 1h
+      tracking-modes: cookie
+
+logging:
+  level:
+    com.example.projetogroq.service: DEBUG
