@@ -108,7 +108,7 @@ public class GroqService {
                 }
 
                 temperature = Math.max(temperature - TEMPERATURE_STEP, MIN_TEMPERATURE);
-                logger.info("Retry Number {} for external api request.", attempt);
+                logger.debug("Retry Number {} for external api request.", attempt + 1);
             }
         }
 
@@ -179,7 +179,7 @@ public class GroqService {
 
     private List<MessageDTO> buildMessages(String context) {
         return List.of(
-                new MessageDTO("system", "Você é excelente na criação de slides de forma profissional."),
+                new MessageDTO("system", "Você cria slides limpos e coerentes."),
                 new MessageDTO("user", context)
         );
     }
@@ -252,12 +252,6 @@ public class GroqService {
         return """
                 Crie slides em formato profissional com bullet points claros e organizados.
                 
-                IMPORTANTE:
-                - Não invente estatísticas específicas ou valores numéricos exatos.
-                - Caso não tenha dados confirmáveis, use descrições qualitativas.
-                - Não crie referências fictícias, principalmente estudos de casos imaginários.
-                - Se mencionar fontes, cite apenas instituições conhecidas sem criar links específicos.
-                
                 Tema: %s
                 Duração total: %d minutos
                 Nível de detalhamento: %s
@@ -266,13 +260,20 @@ public class GroqService {
                 Inclua um slide inicial com o título "Introdução", contextualizando o tema.
                 Inclua um slide final com o título "Referências Bibliográficas".
                 
+                %s%n
+                
+                IMPORTANTE:
+                - Não invente estatísticas específicas ou valores numéricos exatos.
+                - Caso não tenha dados confirmáveis, use descrições qualitativas.
+                - Não crie referências fictícias.
+                - Se mencionar fontes, cite apenas instituições conhecidas sem criar links específicos.
+                - Não crie estudos de caso.
+                
                 Responda apenas com JSON válido conforme o schema definido.
                 Não inclua explicações adicionais.
                 Não use markdown.
                 Não use blocos de código.
                 Não inclua texto antes ou depois.
-                
-                %s
                 """
                 .formatted(dto.topic(), dto.durationInMinutes(), dto.level(), pdfContext);
     }
