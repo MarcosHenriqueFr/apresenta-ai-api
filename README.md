@@ -114,6 +114,7 @@ Caso não possua o maven digite:
 |--------------------------------------------|--------------------------------------------------------------------------------------|
 | <kbd>POST /api/presentation/generate</kbd> | Cria uma apresentação e coloca na Sessão                                             |
 | <kbd>POST /api/files/pptx</kbd>            | Converte o objeto em Sessão em um arquivo baixável, de acordo com o estilo informado |
+<br>
 Pretendo fazer um front-end para esse projeto, então as requisições não estão disponíveis em um arquivo baixável.
 <br>
 
